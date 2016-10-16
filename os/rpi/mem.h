@@ -3,6 +3,7 @@
 #define GiB		1073741824u	/*! Gibi 000000000040000000 */
 
 #define KZERO		0			/*! kernel address space */
+#define KSEGM           0
 #define BY2PG		(4*KiB)			/*! bytes per page */
 #define BI2BY		8			/*! bits per byte */
 #define BI2WD           32                      /* bits per word */
@@ -27,7 +28,7 @@
 
 #define	PHYSDRAM	0
 #define BUSDRAM		0x40000000
-#define	DRAMSIZE	(256*MiB)
+#define	DRAMSIZE	(512*MiB)
 
 #define	PHYSIO		0x20000000
 #define VIRTIO		0x20000000

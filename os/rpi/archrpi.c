@@ -1,11 +1,14 @@
 #include "u.h"
 #include "../port/lib.h"
 #include "mem.h"
+#include "io.h"
 #include "dat.h"
 #include "fns.h"
 
 #include "../port/netif.h"
 #include "etherif.h"
+
+#define       POWERREGS       (VIRTIO+0x100000)
 
 static void
 linkproc(void)
@@ -26,23 +29,8 @@ kprocchild(Proc *p, void (*func)(void*), void *arg)
 	p->arg = arg;
 }
 
-void		
+void
 validaddr(void*, ulong, int) {}
-
-int
-archether(unsigned ctlrno, Ether *ether)
-{
-    switch(ctlrno) {
-    case 0:
-        ether->type = "usb";
-        ether->ctlrno = ctlrno;
-        ether->irq = -1;
-        ether->nopt = 0;
-        ether->mbps = 100;
-        return 1;
-    }
-    return -1;
-}
 
 /*
  * stub for ../omap/devether.c
@@ -50,7 +38,36 @@ archether(unsigned ctlrno, Ether *ether)
 int
 isaconfig(char *class, int ctlrno, ISAConf *isa)
 {
-    USED(ctlrno);
-    USED(isa);
-    return strcmp(class, "ether") == 0;
+	USED(ctlrno);
+	USED(isa);
+	return strcmp(class, "ether") == 0;
+}
+
+enum {
+	Wdogfreq	= 65536,
+	Wdogtime	= 5,	/* seconds, ≤ 15 */
+};
+
+/*
+ * Power management / watchdog registers
+ */
+enum {
+	Rstc		= 0x1c>>2,
+		Password	= 0x5A<<24,
+		CfgMask		= 0x03<<4,
+		CfgReset	= 0x02<<4,
+	Rsts		= 0x20>>2,
+	Wdog		= 0x24>>2,
+};
+
+void reboot(void)
+{
+	u32int *r;
+
+	r = (u32int*)POWERREGS;
+	r[Wdog] = Password | 1;
+	r[Rstc] = Password | (r[Rstc] & ~CfgMask) | CfgReset;
+	coherence();
+	for(;;)
+		;
 }

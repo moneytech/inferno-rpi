@@ -121,6 +121,21 @@ TEXT cachedwbinvse(SB), 1, $-4
 	RET
 
 /*
+ * cacheiinvse(va, n)
+ *   invalidate instructions cache range [va, va+n)
+ */
+TEXT cacheiinvse(SB), 1, $-4
+	MOVW	R0, R1		/* DSB clears R0 */
+	DSB
+	MOVW	n+4(FP), R2
+	ADD	R1, R2
+	SUB	$1, R2
+	BIC	$(CACHELINESZ-1), R1
+	BIC	$(CACHELINESZ-1), R2
+	MCRR(CpSC, 0, 2, 1, CpCACHERANGEinvi)
+	RET
+
+/*
  * cachedwbse(va, n)
  *   drain write buffer
  *   writeback data cache range [va, va+n)
@@ -134,6 +149,22 @@ TEXT cachedwbse(SB), 1, $-4
 	BIC	$(CACHELINESZ-1), R2
 	MCRR(CpSC, 0, 2, 1, CpCACHERANGEdwb)
 	RET
+
+/*
+ * cachedinvse(va, n)
+ *   drain write buffer
+ *   invalidate data cache range [va, va+n)
+ */
+TEXT cachedinvse(SB), 1, $-4
+        MOVW    R0, R1          /* DSB clears R0 */
+        DSB
+        MOVW    n+4(FP), R2
+        ADD     R1, R2
+        SUB     $1, R2
+        BIC     $(CACHELINESZ-1), R1
+        BIC     $(CACHELINESZ-1), R2
+        MCRR(CpSC, 0, 2, 1, CpCACHERANGEinvd)
+        RET
 
 /*
  * drain write buffer and prefetch buffer
@@ -169,6 +200,20 @@ TEXT mmuinvalidate(SB), 1, $-4
  *   invalidate tlb entry for virtual page address va, ASID 0
  */
 TEXT mmuinvalidateaddr(SB), 1, $-4
-   	MCR	CpSC, 0, R0, C(CpTLB), C(CpTLBinvu), CpTLBinvse
+	MCR	CpSC, 0, R0, C(CpTLB), C(CpTLBinvu), CpTLBinvse
 	BARRIERS
 	RET
+
+TEXT _idlehands(SB), $-4
+	BARRIERS
+	MOVW	CPSR, R3
+	BIC	$(PsrDirq|PsrDfiq), R3, R1		/* spllo */
+	MOVW	R1, CPSR
+
+	MOVW	$0, R0				/* wait for interrupt */
+	MCR	CpSC, 0, R0, C(CpCACHE), C(CpCACHEintr), CpCACHEwait
+	ISB
+
+	MOVW	R3, CPSR			/* splx */
+	RET
+

@@ -8,6 +8,8 @@
 #include "armv6.h"
 #include "../port/error.h"
 
+#define INTREGS		(VIRTIO+0xB200)
+
 static char *trapnames[PsrMask+1] = {
 	[ PsrMusr ] "user mode",
 	[ PsrMfiq ] "fiq interrupt",
@@ -41,6 +43,19 @@ typedef struct Vpage0 {
 
 typedef struct Intregs Intregs;
 typedef struct Vctl Vctl;
+
+/*
+ * interrupt control registers
+ */
+struct Intregs {
+        u32int  ARMpending;
+        u32int  GPUpending[2];
+        u32int  FIQctl;
+        u32int  GPUenable[2];
+        u32int  ARMenable;
+        u32int  GPUdisable[2];
+        u32int  ARMdisable;
+};
 
 struct Vctl {
 	Vctl	*next;
@@ -99,6 +114,7 @@ fiq(Ureg *ureg)
 	if(v == nil)
 		panic("unexpected item in bagging area");
 	m->intr++;
+	m->inidle = 0;
 	ureg->pc -= 4;
 	coherence();
 	v->f(ureg, v->a);
@@ -138,6 +154,7 @@ irqenable(int irq, void (*f)(Ureg*, void*), void* a)
 		vctl = v;
 		*enable = v->mask;
 	}
+
 	//print("Enabled irq %d\n", irq);
 }
 
@@ -178,7 +195,13 @@ faultarm(Ureg *ureg)
 	sprint(buf, "sys: trap: fault pc=%8.8lux", (ulong)ureg->pc);
 	if(0){
 		iprint("%s\n", buf);
+
+		print("%s\n", buf);
+		print("Around PC?: %8.8uX\n", ureg->pc);
+		dumparound(ureg->pc);
+
 		dumpregs(ureg);
+		for(;;);
 	}
 	disfault(ureg, buf);
 }
@@ -221,6 +244,7 @@ trap(Ureg *ureg)
 		t = m->ticks;		/* CPU time per proc */
 		up = nil;		/* no process at interrupt level */
 		irq(ureg);
+		m->inidle = 0;
 		up = m->proc;
 		preemption(m->ticks - t);
 		m->intr++;
@@ -291,6 +315,8 @@ faultpanic:
 		panic("exception %uX %s\n", ureg->type, trapname(ureg->type));
 		break;
 	}
+
+	m->inidle = 0;
 
 	splhi();
 	if(up)

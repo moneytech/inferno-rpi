@@ -18,13 +18,14 @@ extern int heap_pool_pcnt;
 extern int image_pool_pcnt;
 
 char* getconf(char*) { return nil; }
-void okay(int /*on*/) {}
 
 void
 confinit(void)
 {
 	ulong base;
+	getramsize(&conf);
 	conf.topofmem = 128*MB;
+	getramsize(&conf);
 
 	base = PGROUND((ulong)end);
 	conf.base0 = base;
@@ -48,11 +49,17 @@ confinit(void)
 static void
 poolsizeinit(void)
 {
-	ulong nb;
+	u64int nb;
+	ulong mpb,hpb,ipb;
+
 	nb = conf.npage*BY2PG;
-	poolsize(mainmem, (nb*main_pool_pcnt)/100, 0);
-	poolsize(heapmem, (nb*heap_pool_pcnt)/100, 0);
-	poolsize(imagmem, (nb*image_pool_pcnt)/100, 1);
+	mpb = (nb*main_pool_pcnt)/100;
+	hpb = (nb*heap_pool_pcnt)/100;
+	ipb = (nb*image_pool_pcnt)/100;
+
+	poolsize(mainmem, mpb, 0);
+	poolsize(heapmem, hpb, 0);
+	poolsize(imagmem, ipb, 0);
 }
 
 uint
@@ -60,8 +67,10 @@ getfirmware(void);
 
 void
 main() {
+	uint j=0,i=0,k=0;
 	uint rev;
 	ulong pc;
+
 	pc = getpc();
 	pl011_addr((void *)pc, 1);
 	pl011_puts("Entered main() at ");
@@ -86,7 +95,6 @@ main() {
 	pl011_addr((char *)&end,	1);
 
 	conf.nmach = 1;
-	serwrite = &pl011_serputs;
 
 	quotefmtinstall();
 	confinit();
@@ -94,16 +102,17 @@ main() {
 	xinit();
 	poolinit();
 	poolsizeinit();
+	//uartconsinit();
 	screeninit();
 	trapinit();
 	timersinit();
 	clockinit();
 	printinit();
-	pl011init();
 	swcursorinit();
 
 	rev = getfirmware();
-	print("\nARM %ld MHz id %8.8lux firmware: rev %d\n", (m->cpuhz+500000)/1000000, getcpuid(), rev);
+	print("\nARM %ld MHz id %8.8lux firmware: rev %d, mem: %ld\n"
+		,(m->cpuhz+500000)/1000000, getcpuid(), rev, conf.topofmem/MB);
 	print("Inferno OS %s Vita Nuova\n", VERSION);
 	print("Ported to Raspberry Pi (BCM2835) by LynxLine\n\n");
 
@@ -128,7 +137,7 @@ init0(void)
 
 	up->nerrlab = 0;
 
-	print("Starting init0()\n");
+	//print("Starting init0()\n");
 	spllo();
 
 	if(waserror())
@@ -186,13 +195,23 @@ userinit(void)
 	ready(p);
 }
 
-void	segflush(void*, ulong) { return; }
-void	idlehands(void) { return; }
+void
+segflush(void* p, ulong n) {
+	cachedwbinvse(p,n);
+	cacheiinvse(p,n);
+}
+
+void
+idlehands(void) {
+	m->inidle = 1;
+	_idlehands();
+}
 
 void	exit(int) { return; }
-void	reboot(void) { return; }
 void	halt(void) { spllo(); for(;;); }
 
 void	fpinit(void) {}
 void	FPsave(void*) {}
 void	FPrestore(void*) {}
+void	clockcheck(void) { return; }
+

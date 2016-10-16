@@ -3,6 +3,7 @@
 #define PADDR(p)	((ulong)p)
 #define DMAADDR(va)	(BUSDRAM |((uintptr)(va)))
 #define DMAIO(va)	(BUSIO | ((uintptr)(va)))
+#define MASK(v)   ((1UL << (v)) - 1)      /* mask `v' bits wide */
 #define waserror()	(up->nerrlab++, setlabel(&up->errlab[up->nerrlab-1]))
 #define procsave(p)	/* Save the mach part of the current */
 			/* process state, no need for one cpu */
@@ -14,12 +15,9 @@ void    (*screenputs)(char*, int);
 
 #include "../port/portfns.h"
 
-int	pl011_getc(void);
 void	pl011_putc(int);
 void	pl011_puts(char *);
-void	pl011_serputs(char *, int);
 void	pl011_addr(void *a, int nl);
-void	pl011init(void);
 
 ulong	getsp(void);
 ulong   getsc(void);
@@ -32,7 +30,12 @@ u32int	lcycles(void);
 int	splfhi(void);
 int	tas(void *);
 
+void	delay(int);
+int	islo(void);
+void	microdelay(int);
 void	idlehands(void);
+void	_idlehands(void);
+
 void	coherence(void);
 void	clockinit(void);
 void	trapinit(void);
@@ -52,6 +55,8 @@ void	irqenable(int, void (*)(Ureg*, void*), void*);
 void	cachedwbinv(void);
 void	cachedwbse(void*, int);
 void	cachedwbinvse(void*, int);
+void	cachedinvse(void*, int);
+void	cacheiinvse(void*, int);
 void	cacheiinv(void);
 void	cacheuwbinv(void);
 
@@ -68,7 +73,19 @@ int	fpiarm(Ureg*);
 
 char*	getconf(char*);
 char *	getethermac(void);
+void	getramsize(Conf *);
 
 void	drawqlock(void);
 void	drawqunlock(void);
 int	candrawqlock(void);
+void	swcursorinit(void);
+
+int	isaconfig(char *, int, ISAConf *);
+
+uintptr dmaaddr(void *va);
+void 	dmastart(int, int, int, void*, void*, int);
+int 	dmawait(int);
+
+#define PTR2UINT(p)     ((uintptr)(p))
+#define UINT2PTR(i)     ((void*)(i))
+

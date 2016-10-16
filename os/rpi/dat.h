@@ -12,12 +12,15 @@ typedef struct Lock Lock;
 typedef struct Ureg Ureg;
 typedef struct Label Label;
 typedef struct FPenv FPenv;
+typedef struct I2Cdev I2Cdev;
+typedef struct PhysUart PhysUart;
 typedef struct Mach Mach;
 typedef struct MMMU	MMMU;
 typedef struct FPU FPU;
 typedef ulong  Instr;
 typedef struct Conf Conf;
 typedef u32int PTE;
+typedef struct Soc      Soc;
 
 struct Lock
 {
@@ -31,6 +34,11 @@ struct Label
 {
 	ulong   sp;
 	ulong   pc;
+};
+
+enum {
+        Maxfpregs       = 32,   /* could be 16 or 32, see Mach.fpnregs */
+	Nfpctlregs      = 16,
 };
 
 enum
@@ -71,6 +79,26 @@ struct Conf
 	int     monitor;    /* flag */
 };
 
+struct I2Cdev {
+	int	salen;
+	int	addr;
+	int	tenbit;
+};
+
+/*
+ * GPIO
+ */
+enum {
+	Input	= 0x0,
+	Output	= 0x1,
+	Alt0	= 0x4,
+	Alt1	= 0x5,
+	Alt2	= 0x6,
+	Alt3	= 0x7,
+	Alt4	= 0x3,
+	Alt5	= 0x2,
+};
+
 /*
  *  MMU stuff in Mach.
  */
@@ -90,8 +118,23 @@ struct Mach
 	Label   sched;		/* scheduler wakeup */
 	int	intr;
 	uvlong	fastclock;	/* last sampled value */
+	int     cpumhz;
 	ulong	cpuhz;
+	uvlong	cyclefreq;	/* Frequency of user readable cycle counter */
+	u32int	inidle;
+	u32int	idleticks;
 	MMMU;
+
+	/* vfp2 or vfp3 fpu */
+	int     havefp;
+	int     havefpvalid;
+	int     fpon;
+	int     fpconfiged;
+	int     fpnregs;
+	ulong   fpscr;                  /* sw copy */
+	int     fppid;                  /* pid of last fault */
+	uintptr fppc;                   /* addr of last fault */
+	int     fpcnt;                  /* how many consecutive at that addr */
 
 	/* stacks for exceptions */
 	ulong   fiqstack[5];
@@ -143,4 +186,15 @@ struct DevConf
 	int	nports;			/* Number of ports */
 	Devport	*ports;			/* The ports themselves */
 };
+
+struct Soc {                    /* SoC dependent configuration */
+        ulong   dramsize;
+        uintptr physio;
+        uintptr busdram;
+        uintptr busio;
+        uintptr armlocal;
+        u32int  l1ptedramattrs;
+        u32int  l2ptedramattrs;
+};
+extern Soc soc;
 
